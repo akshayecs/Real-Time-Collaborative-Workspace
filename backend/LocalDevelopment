@@ -1,0 +1,97 @@
+🧪 A. Local Development (NO Docker)
+1️⃣ Start infrastructure locally
+
+You must already have these running:
+
+| Service    | How            |
+| ---------- | -------------- |
+| PostgreSQL | Local / Docker |
+| Redis      | Local / Docker |
+| Kafka      | Docker         |
+| MongoDB    | Local / Docker |
+
+Recommended (from backend/docker):
+
+docker-compose -f docker-compose.kafka.yml up -d
+
+2️⃣ Backend API (dev mode)
+cd backend
+npm install
+npm run dev
+
+API runs at:
+
+http://localhost:4000
+
+Swagger:
+
+http://localhost:4000/docs
+
+3️⃣ Kafka Worker (dev)
+
+In another terminal:
+
+cd backend
+npm run worker:dev
+
+(If missing, add to package.json):
+
+"scripts": {
+"worker:dev": "ts-node src/infrastructure/kafka/job.worker.ts"
+}
+
+🐳 B. Docker (FULL STACK LOCAL)
+
+This is the recommended local experience.
+
+cd backend/docker
+docker-compose up --build
+
+What starts:
+
+Service
+API
+Kafka
+Zookeeper
+Redis
+MongoDB
+PostgreSQL
+Kafka Worker
+
+API:
+
+http://localhost:4000
+
+Swagger:
+
+http://localhost:4000/docs
+
+🧪 C. Testing
+Unit + Integration tests
+cd backend
+npm run test
+
+Coverage
+npm run test:coverage
+
+Coverage report:
+
+backend/coverage/lcov-report/index.html
+
+🚀 D. Production (Railway / Render)
+
+You do not run commands manually.
+
+Railway does:
+
+npm install
+
+npm run build
+
+node dist/server.js
+
+Worker uses:
+
+node dist/infrastructure/kafka/job.worker.js
+
+Environment variables come from Railway UI.

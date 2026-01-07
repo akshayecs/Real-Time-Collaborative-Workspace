@@ -1,0 +1,469 @@
+Real-Time Collaborative Workspace Backend
+📌 Overview
+
+This project is a production-grade backend service for a real-time collaborative workspace (similar to a simplified collaborative coding platform).
+
+It is designed with scalability, security, and real-time communication as first-class concerns.
+
+The system supports:
+
+Secure authentication & authorization
+
+Project & workspace management
+
+Real-time collaboration via WebSockets
+
+Kafka-based event streaming
+
+Asynchronous background job processing
+
+Audit & activity logging
+
+Cloud-ready containerized deployment
+
+🏗️ High-Level Architecture
+┌──────────────┐
+│ Clients │
+│ (Web / API) │
+└──────┬───────┘
+│
+REST + WebSocket
+│
+┌─────────────▼─────────────┐
+│ API Server │
+│ (Node.js + Express) │
+│ │
+│ - Auth (JWT + RBAC) │
+│ - Projects / Workspaces │
+│ - WebSockets │
+│ │
+└──────┬──────────┬─────────┘
+│ │
+Produce │ │ Consume
+│ │
+┌─────▼──────────▼─────┐
+│ Kafka │
+│ (Event Backbone) │
+│ │
+│ - workspace-events │
+│ - job-events │
+└─────┬──────────┬─────┘
+│ │
+┌────────────▼─┐ ┌────▼────────────┐
+│ WS Broadcaster│ │ Job Worker │
+│ (Kafka Consumer) │ │ (Kafka Consumer)
+└──────────────┘ └────┬────────────┘
+│
+┌────────────▼────────────┐
+│ Datastores │
+│ │
+│ PostgreSQL → Core Data │
+│ MongoDB → Activity Logs │
+│ Redis → Cache / RateLimit│
+└──────────────────────────┘
+
+🧱 Tech Stack
+Backend
+
+Node.js + TypeScript
+
+Express.js
+
+Socket.IO (real-time communication)
+
+Messaging & Streaming
+
+Apache Kafka (KafkaJS)
+
+Event backbone
+
+Real-time fan-out
+
+Async jobs
+
+Databases
+
+PostgreSQL (Prisma ORM)
+
+Users, Projects, Workspaces, Jobs
+
+MongoDB
+
+Activity logs & audit trail
+
+Redis
+
+Caching, rate-limiting
+
+Infrastructure
+
+Docker & Docker Compose
+
+JWT Authentication
+
+RBAC (Owner / Collaborator / Viewer)
+
+🔐 Authentication & Authorization
+Authentication
+
+JWT access tokens (short-lived)
+
+Refresh tokens (DB-stored & rotated)
+
+Token revocation on logout
+
+Authorization
+
+Workspace-scoped RBAC
+
+Permission-based access
+
+Enforced at application layer
+
+Roles
+
+Role Permissions
+OWNER Admin + Write + Read
+COLLABORATOR Write + Read
+VIEWER Read
+📂 Domain-Driven Design (Clean Architecture)
+src/
+├── domain/ # Pure business models
+├── application/ # Use cases
+├── infrastructure/ # DB, Kafka, Redis, Mongo
+├── interfaces/ # HTTP & WebSocket APIs
+├── shared/ # Utilities & types
+
+Benefits
+
+Clear separation of concerns
+
+Testability
+
+Scalability
+
+Easy refactoring
+
+⚡ Real-Time Collaboration
+
+WebSockets authenticated using JWT
+
+Workspace-scoped rooms
+
+Events:
+
+User join / leave
+
+File changes (mocked payloads)
+
+Kafka used to:
+
+Broadcast events across instances
+
+Guarantee ordering per workspace
+
+Enable horizontal scaling
+
+🔁 Asynchronous Jobs
+
+Jobs submitted via REST API
+
+Kafka used as job queue
+
+Worker processes jobs independently
+
+Job lifecycle:
+
+PENDING → RUNNING → SUCCESS / FAILED
+
+Idempotency enforced via database
+
+Job status persisted in PostgreSQL
+
+Job events logged to MongoDB
+
+📝 Activity & Audit Logs
+
+MongoDB used for write-heavy activity logs
+
+Logged events:
+
+Workspace joins/leaves
+
+File updates
+
+Job success/failure
+
+Kafka consumers persist logs
+
+Activity feed available via API
+
+---------------------------------------------------------
+
+Clients
+ ├─ REST APIs (HTTP)
+ ├─ WebSockets (Realtime)
+ |
+API Gateway / Backend Service (Node.js)
+ ├─ Auth & RBAC
+ ├─ Project / Workspace APIs
+ ├─ WebSocket Gateway
+ ├─ Job Dispatcher
+ |
+ ├─ PostgreSQL (Relational Data)
+ ├─ Redis (Cache + Pub/Sub),Kafka,RabbitMQ
+ ├─ MongoDB (Events / Logs)
+ |
+Background Workers
+ ├─ Job Processing
+ ├─ Retry & Failure Handling
+
+
+
+-------------------------------------------------------------------------------ARCHITECTURE------------------------------------------------------------------------
+
+
+                ┌─────────────┐
+                │   Client    │
+                │ (Web / App) │
+                └─────┬───────┘
+                      │
+          REST APIs    │    WebSockets
+                      │
+        ┌─────────────▼─────────────┐
+        │     API Gateway / App     │
+        │   Node.js + Express.js    │
+        └─────┬───────────┬────────┘
+              │           │
+       PostgreSQL     WebSocket Server
+              │           │
+          Redis Cache  Redis Pub/Sub
+              │           │
+          MongoDB     Message Broker
+                              │
+                        Background Workers
+
+
+--------------------------------------------------------------------Domain Relationships (ER Diagram)---------------------------------------
+
+User ──┬── Project ── Workspace ── WorkspaceMembers
+       │
+       └── Jobs ── JobAttempts
+
+
+
+---------------------------------------------------------------------------------------Clean Architecture----------------------------------------------------------------------------------
+
+
+
+
+┌──────────────────────────┐
+│   Presentation Layer     │  → Controllers / Routes
+└───────────▲──────────────┘
+            │
+┌───────────┴──────────────┐
+│   Application Layer      │  → Use cases / Services
+└───────────▲──────────────┘
+            │
+┌───────────┴──────────────┐
+│     Domain Layer         │  → Entities, rules
+└───────────▲──────────────┘
+            │
+┌───────────┴──────────────┐
+│ Infrastructure Layer    │  → DB, Redis, MQ, WebSocket
+└──────────────────────────┘
+
+
+
+---------------------------------------------------------------------Final Backend Folder Structure---------------------------------------------------------------
+
+
+
+
+
+backend/
+├── src/
+│   ├── config/              # env, constants, feature flags
+│   │   ├── env.ts
+│   │   ├── redis.ts
+│   │   ├── logger.ts
+│   │   └── rateLimiter.ts
+│   │
+│   ├── domain/              # PURE business logic
+│   │   ├── user/
+│   │   │   ├── user.entity.ts
+│   │   │   └── user.types.ts
+│   │   ├── project/
+│   │   ├── workspace/
+│   │   └── job/
+│   │
+│   ├── application/         # Use cases
+│   │   ├── auth/
+│   │   │   ├── login.usecase.ts
+│   │   │   ├── refreshToken.usecase.ts
+│   │   ├── project/
+│   │   ├── workspace/
+│   │   └── job/
+│   │
+│   ├── infrastructure/      # External services
+│   │   ├── db/
+│   │   │   ├── prisma.ts
+│   │   │   └── repositories/
+│   │   ├── mongo/
+│   │   ├── redis/
+│   │   ├── queue/
+│   │   └── websocket/
+│   │
+│   ├── interfaces/          # API layer
+│   │   ├── http/
+│   │   │   ├── controllers/
+│   │   │   ├── routes/
+│   │   │   └── middlewares/
+│   │   └── websocket/
+│   │
+│   ├── shared/              # Common utilities
+│   │   ├── errors/
+│   │   ├── utils/
+│   │   └── types/
+│   │
+│   ├── app.ts               # express app
+│   └── server.ts            # entry point
+│
+├── prisma/
+│   └── schema.prisma
+│
+├── tests/
+│   ├── unit/
+│   └── integration/
+│
+├── docker/
+│   ├── Dockerfile
+│   └── docker-compose.yml
+│
+├── .env.example
+├── tsconfig.json
+└── README.md
+
+
+
+---------------------------------------------------------------------------Auth Flow------------------------------------------------------------------------------------
+
+Login
+ ├─ verify credentials
+ ├─ issue ACCESS_TOKEN (short-lived)
+ └─ issue REFRESH_TOKEN (long-lived, stored hashed in DB)
+
+Request
+ ├─ client sends ACCESS_TOKEN
+ └─ auth middleware validates
+
+Refresh
+ ├─ client sends REFRESH_TOKEN
+ ├─ old token revoked
+ └─ new token issued
+
+
+------------------------------------------------------------------------------Real-Time Architecture-----------------------------------------------------------
+
+
+
+Client
+  │
+  │ WebSocket (JWT)
+  ▼
+Node WS Server
+  │
+  ├─ Broadcast locally
+  └─ Publish to Redis
+         │
+         ▼
+   Other WS Servers
+
+   -----------------------------------------------------------------------------High Level Design-----------------------------------------------------------------------------------
+
+Producer → Kafka Topic
+              ↓
+        Consumer (Job Handler)
+              ↓
+     ┌── Success → Commit offset
+     │
+     └── Failure
+          ├─ Retry (with backoff)
+          ├─ Check idempotency
+          └─ Max retries → DLQ
+
+------------------------------------------
+
+
+Client (WebSocket)
+   |
+Node API Server
+   |
+   | produce events
+   v
+Kafka Topic (workspace-events)
+   |
+   | consume events
+   v
+WebSocket Broadcaster / Workers
+
+
+
+
+
+----------------------------------------------------------------------Kafka Architecture--------------------------------------------------------------------
+
+┌────────────┐
+│ Zookeeper  │  ← metadata, leader election
+└─────▲──────┘
+      │
+┌─────┴──────┐
+│   Kafka    │  ← workspace-events, job-events
+└─────▲──────┘
+      │
+┌─────┴──────────────┐
+│ Node.js Backend    │
+│ (producer/consumer)│
+└────────────────────┘
+
+
+-----------------------------------------OVERALL REAL-TIME FLOW---------------------------------------------
+
+HTTP (Postman)           WebSocket (Real-time)
+───────────────         ─────────────────────
+Create Workspace   →    Join Workspace Socket
+Invite User        →    Presence Updates
+Create Project     →    Live Events
+Assign Roles       →    Permissions Sync
+Emit Events        →    Kafka → Workers → Broadcast
+
+
+-------------------------------- Testing order logically --------------------
+
+### API Testing Flow (IMPORTANT)
+
+## You must test APIs in a logical order, not randomly.
+
+# 🔁 Test Sequence
+
+1.Auth
+-Register
+-Login → Save token
+
+2.Workspace
+-Create workspace
+-Invite user
+
+3.Project
+-Create project
+
+4.Activity
+-MongoDB audit logs appear
+
+5.Jobs
+-Create job
+-Kafka consumes → worker processes
+
+6.RBAC
+-Redis permissions cached
+

@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "Real-Time Collaborative Workspace API",
+    "description": "End-to-end API testing for Auth, RBAC, Workspaces, Projects, Kafka Jobs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "if (pm.environment.get('accessToken')) {",
+          "  pm.request.headers.add({",
+          "    key: 'Authorization',",
+          "    value: `Bearer ${pm.environment.get('accessToken')}`",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "PHASE 1 — AUTH",
+      "item": [
+        {
+          "name": "Register Owner",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"Password@123\",\n  \"name\": \"Workspace Owner\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.set('accessToken', pm.response.json().accessToken);",
+                  "pm.test('Login successful', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"Password@123\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE 2 — BOOTSTRAP",
+      "item": [
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.set('projectId', pm.response.json().id);",
+                  "pm.test('Project created', () => pm.response.code === 201);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/projects",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Realtime Collaboration Platform\",\n  \"description\": \"Project for real-time collaborative workspace system\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Workspace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.set('workspaceId', pm.response.json().id);",
+                  "pm.test('Workspace created', () => pm.response.code === 201);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/workspaces",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Engineering Workspace\",\n  \"projectId\": \"{{projectId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE 3 — RBAC",
+      "item": [
+        {
+          "name": "Invite Existing User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.environment.set('invitedUserId', pm.response.json().userId);",
+                  "pm.test('User invited', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/workspaces/{{workspaceId}}/invite",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"member@example.com\",\n  \"role\": \"VIEWER\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/workspaces/{{workspaceId}}/members/{{invitedUserId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"EDITOR\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE 4 — READ",
+      "item": [
+        {
+          "name": "List Workspaces",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/workspaces"
+          }
+        },
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/projects"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE 5 — JOBS (Kafka)",
+      "item": [
+        {
+          "name": "Create Job",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/jobs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"AUDIT_LOG\",\n  \"payload\": {\n    \"message\": \"User invited to workspace\"\n  }\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
