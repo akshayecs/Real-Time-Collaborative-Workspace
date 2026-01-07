@@ -1,0 +1,4 @@
+export enum JobType {
+    CODE_EXECUTION = "CODE_EXECUTION",
+    INDEX_WORKSPACE = "INDEX_WORKSPACE"
+}
