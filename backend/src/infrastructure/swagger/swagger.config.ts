@@ -10,7 +10,7 @@ export const swaggerSpec = swaggerJsdoc({
         },
         servers: [
             {
-                url: "/api/v1",
+                url: "/",
                 description: "Production",
             },
         ],
