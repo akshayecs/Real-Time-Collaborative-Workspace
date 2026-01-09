@@ -1,9 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import swaggerUi from "swagger-ui-express";
-import { swaggerSpec } from "./infrastructure/swagger/swagger.config";
-
 import http from "http";
 import { createApp } from "./app";
 import { connectPrisma } from "./infrastructure/db/prisma";
