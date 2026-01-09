@@ -73,11 +73,11 @@ export const createApp = async () => {
         });
     });
 
-    try {
-        await startKafkaConsumers();
-    } catch (err) {
-        console.error("❌ Kafka startup failed", err);
-    }
+    // try {
+    //     await startKafkaConsumers();
+    // } catch (err) {
+    //     console.error("❌ Kafka startup failed", err);
+    // }
 
     return app;
 };
