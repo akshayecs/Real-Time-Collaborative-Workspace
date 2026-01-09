@@ -23,6 +23,25 @@ const startServer = async () => {
     const server = http.createServer(app);
 
     await initSocketServer(server);
+
+    if (
+        process.env.ENABLE_JOBS === 'true' &&
+        process.env.KAFKA_BROKER &&
+        process.env.KAFKA_BROKER !== 'disabled'
+    ) {
+        try {
+            const { startKafkaConsumers } = await import(
+                "./infrastructure/kafka/start.kafka"
+            );
+            await startKafkaConsumers();
+            logger.info("🧵 Kafka consumers started");
+        } catch (err) {
+            logger.error("❌ Kafka startup failed", err);
+        }
+    } else {
+        logger.info("🚫 Kafka consumers disabled");
+    }
+
     app.listen(PORT, "0.0.0.0", () => {
         logger.info(`🚀 Server running on port ${env.PORT}`);
     });
