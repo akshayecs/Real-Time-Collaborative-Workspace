@@ -24,7 +24,9 @@ const envSchema = z.object({
     RATE_LIMIT_MAX_REQUESTS: z.string(),
 
     ENABLE_WEBSOCKETS: z.string(),
-    ENABLE_JOBS: z.string()
+    ENABLE_JOBS: z.string(),
+
+    KAFKA_BROKERS: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
