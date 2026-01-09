@@ -42,5 +42,6 @@ export const env = {
     RATE_LIMIT_WINDOW_MS: Number(parsed.data.RATE_LIMIT_WINDOW_MS),
     RATE_LIMIT_MAX_REQUESTS: Number(parsed.data.RATE_LIMIT_MAX_REQUESTS),
     ENABLE_WEBSOCKETS: parsed.data.ENABLE_WEBSOCKETS === "true",
-    ENABLE_JOBS: parsed.data.ENABLE_JOBS === "true"
+    ENABLE_JOBS: parsed.data.ENABLE_JOBS === "true",
+    KAFKA_BROKERS: parsed.data.KAFKA_BROKERS === "disabled"
 };
