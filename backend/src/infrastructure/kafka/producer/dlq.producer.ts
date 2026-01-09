@@ -1,10 +1,20 @@
-import { kafka } from "../kafka.client";
+import { getKafkaProducer } from "../kafka.producer";
 import { KAFKA_TOPICS } from "../topics";
 
-const producer = kafka.producer();
+/**
+ * Send a message to Dead Letter Queue (DLQ)
+ * Kafka-safe, lazy, optional
+ */
+export const sendToDLQ = async (
+    message: any,
+    reason: string
+) => {
+    const producer = await getKafkaProducer();
 
-export const sendToDLQ = async (message: any, reason: string) => {
-    await producer.connect();
+    if (!producer) {
+        // Kafka disabled → nothing to do
+        return;
+    }
 
     await producer.send({
         topic: KAFKA_TOPICS.JOBS_DLQ,

@@ -2,24 +2,17 @@ import { Server } from "socket.io";
 import http from "http";
 import { verifyAccessToken } from "../../shared/utils/jwt";
 import { logger } from "../../config/logger";
-import {
-    kafkaProducer,
-    kafkaConsumer
-} from "../../infrastructure/kafka/kafka.client";
+import { env } from "../../config/env";
 
 const WORKSPACE_TOPIC = "workspace-events";
 
+/**
+ * Initialize WebSocket server
+ * Kafka is OPTIONAL and lazy-loaded
+ */
 export const initSocketServer = async (server: http.Server) => {
     const io = new Server(server, {
-        cors: { origin: "*" }
-    });
-
-    // 🔌 Kafka setup
-    await kafkaProducer.connect();
-    await kafkaConsumer.connect();
-    await kafkaConsumer.subscribe({
-        topic: WORKSPACE_TOPIC,
-        fromBeginning: false
+        cors: { origin: "*" },
     });
 
     // 🔐 Socket authentication
@@ -36,32 +29,58 @@ export const initSocketServer = async (server: http.Server) => {
         }
     });
 
+    /**
+     * Lazy Kafka producer (shared for sockets)
+     */
+    let producer: any = null;
+
+    async function getProducer() {
+        if (!env.ENABLE_JOBS) return null;
+
+        if (producer) return producer;
+
+        const { createKafka } = await import(
+            "../../infrastructure/kafka/kafka.client"
+        );
+
+        const kafka = createKafka();
+        producer = kafka.producer();
+        await producer.connect();
+
+        return producer;
+    }
+
     io.on("connection", (socket) => {
         logger.info(`🔌 Socket connected: ${socket.id}`);
 
         socket.on("workspace:join", async ({ workspaceId }) => {
             socket.join(workspaceId);
 
-            // Publish event to Kafka
-            await kafkaProducer.send({
+            const producer = await getProducer();
+            if (!producer) return;
+
+            await producer.send({
                 topic: WORKSPACE_TOPIC,
                 messages: [
                     {
-                        key: workspaceId, // 🔑 ensures ordering per workspace
+                        key: workspaceId,
                         value: JSON.stringify({
                             type: "USER_JOINED",
                             workspaceId,
-                            userId: socket.data.userId
-                        })
-                    }
-                ]
+                            userId: socket.data.userId,
+                        }),
+                    },
+                ],
             });
         });
 
         socket.on("workspace:leave", async ({ workspaceId }) => {
             socket.leave(workspaceId);
 
-            await kafkaProducer.send({
+            const producer = await getProducer();
+            if (!producer) return;
+
+            await producer.send({
                 topic: WORKSPACE_TOPIC,
                 messages: [
                     {
@@ -69,15 +88,18 @@ export const initSocketServer = async (server: http.Server) => {
                         value: JSON.stringify({
                             type: "USER_LEFT",
                             workspaceId,
-                            userId: socket.data.userId
-                        })
-                    }
-                ]
+                            userId: socket.data.userId,
+                        }),
+                    },
+                ],
             });
         });
 
         socket.on("file:change", async ({ workspaceId, payload }) => {
-            await kafkaProducer.send({
+            const producer = await getProducer();
+            if (!producer) return;
+
+            await producer.send({
                 topic: WORKSPACE_TOPIC,
                 messages: [
                     {
@@ -86,10 +108,10 @@ export const initSocketServer = async (server: http.Server) => {
                             type: "FILE_CHANGED",
                             workspaceId,
                             payload,
-                            userId: socket.data.userId
-                        })
-                    }
-                ]
+                            userId: socket.data.userId,
+                        }),
+                    },
+                ],
             });
         });
 
@@ -103,17 +125,6 @@ export const initSocketServer = async (server: http.Server) => {
         socket.on("disconnect", () => {
             logger.info(`❌ Socket disconnected: ${socket.id}`);
         });
-    });
-
-    // 🔁 Kafka → WebSocket fan-out
-    await kafkaConsumer.run({
-        eachMessage: async ({ message }) => {
-            if (!message.value) return;
-
-            const event = JSON.parse(message.value.toString());
-
-            io.to(event.workspaceId).emit(event.type, event);
-        }
     });
 
     return io;

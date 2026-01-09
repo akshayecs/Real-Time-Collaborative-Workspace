@@ -1,8 +1,19 @@
-import { kafkaProducer } from "./kafka.client";
+import { getKafkaProducer } from "./kafka.producer";
 import { JobMessage } from "./job.types";
 
-export const publishJob = async <T>(topic: string, message: JobMessage<T>) => {
-    await kafkaProducer.send({
+export const publishJob = async <T>(
+    topic: string,
+    message: JobMessage<T>
+) => {
+    // ✅ Lazy & optional Kafka
+    const producer = await getKafkaProducer();
+
+    if (!producer) {
+        // Kafka disabled → silently skip
+        return;
+    }
+
+    await producer.send({
         topic,
         messages: [
             {

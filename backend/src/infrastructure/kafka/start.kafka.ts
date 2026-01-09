@@ -1,13 +1,27 @@
-import { kafka } from "./kafka.client";
+import { env } from "../../config/env";
 import { KAFKA_TOPICS } from "./topics";
 import { JobConsumer } from "./consumer/job.consumer";
 
+/**
+ * Start Kafka consumers (WORKER ONLY)
+ * Safe, lazy, production-ready
+ */
 export const startKafkaConsumers = async () => {
+    if (!env.ENABLE_JOBS) {
+        console.log("🚫 Kafka consumers disabled");
+        return;
+    }
+
+    const { createKafka } = await import("./kafka.client");
+
+    const kafka = createKafka();
+
     const consumer = kafka.consumer({
         groupId: "job-consumer-group",
     });
 
     await consumer.connect();
+
     await consumer.subscribe({
         topic: KAFKA_TOPICS.JOBS,
         fromBeginning: false,
@@ -24,7 +38,7 @@ export const startKafkaConsumers = async () => {
             try {
                 await jobConsumer.process(payload);
             } catch (err) {
-                // Retry is handled inside BaseKafkaConsumer
+                // Let KafkaJS handle retries / crashes
                 throw err;
             }
         },

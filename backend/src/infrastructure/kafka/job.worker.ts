@@ -1,19 +1,41 @@
-import { kafkaConsumer, kafkaProducer } from "./kafka.client";
 import { prisma } from "../db/prisma";
 import { logger } from "../../config/logger";
 import { JobStatus } from "@prisma/client";
 import { ActivityLogger } from "../../application/activity/activity-logger.service";
+import { env } from "../../config/env";
 
 const JOB_TOPIC = "job-events";
 const DLQ_TOPIC = "job-events-dlq";
-const activityLogger = new ActivityLogger();
-
 const BASE_RETRY_DELAY_MS = 2000;
 
-const processJob = async (jobId: string) => {
-    // 1️⃣ Fetch job with lock check
-    const job = await prisma.job.findUnique({ where: { id: jobId } });
+const activityLogger = new ActivityLogger();
 
+/**
+ * Lazy Kafka init for WORKER only
+ */
+async function getKafkaClients() {
+    if (!env.ENABLE_JOBS) {
+        throw new Error("Kafka worker started with ENABLE_JOBS=false");
+    }
+
+    const { createKafka } = await import("./kafka.client");
+
+    const kafka = createKafka();
+
+    const producer = kafka.producer();
+    const consumer = kafka.consumer({ groupId: "job-workers" });
+
+    await producer.connect();
+    await consumer.connect();
+
+    return { producer, consumer };
+}
+
+const processJob = async (
+    jobId: string,
+    producer: any
+) => {
+    const job = await prisma.job.findUnique({ where: { id: jobId } });
     if (!job) return;
 
     // ✅ Idempotency
@@ -22,95 +44,94 @@ const processJob = async (jobId: string) => {
         return;
     }
 
+    // ❌ Exceeded retries → DLQ
     if (job.retryCount >= job.maxRetries) {
         logger.error(`☠️ Job exceeded retries: ${jobId}`);
 
         await prisma.job.update({
             where: { id: jobId },
-            data: { status: JobStatus.FAILED }
+            data: { status: JobStatus.FAILED },
         });
 
-        await kafkaProducer.send({
+        await producer.send({
             topic: DLQ_TOPIC,
-            messages: [{ value: JSON.stringify({ jobId }) }]
+            messages: [{ value: JSON.stringify({ jobId }) }],
         });
 
         return;
     }
 
     try {
-        // 2️⃣ Mark RUNNING
+        // 1️⃣ Mark RUNNING
         await prisma.job.update({
             where: { id: jobId },
             data: {
                 status: JobStatus.RUNNING,
-                lockedAt: new Date()
-            }
+                lockedAt: new Date(),
+            },
         });
 
-        // 🔧 Simulated heavy work
+        // 🔧 Simulated work
         await new Promise((r) => setTimeout(r, 3000));
 
-        // 3️⃣ SUCCESS
+        // 2️⃣ SUCCESS
         await prisma.job.update({
             where: { id: jobId },
             data: {
                 status: JobStatus.SUCCESS,
-                result: { message: "Completed" }
-            }
+                result: { message: "Completed" },
+            },
         });
 
         await activityLogger.log("SYSTEM", "JOB_SUCCESS", { jobId });
 
         logger.info(`✅ Job completed: ${jobId}`);
-
     } catch (err: any) {
         logger.error(err);
 
         const retryCount = job.retryCount + 1;
         const delay = BASE_RETRY_DELAY_MS * Math.pow(2, retryCount);
 
-        // 4️⃣ Increment retry count
         await prisma.job.update({
             where: { id: jobId },
             data: {
                 retryCount,
-                status: JobStatus.PENDING
-            }
+                status: JobStatus.PENDING,
+            },
         });
 
         await activityLogger.log("SYSTEM", "JOB_RETRY", {
             jobId,
-            retryCount
+            retryCount,
         });
 
         logger.warn(`🔁 Retrying job ${jobId} in ${delay}ms`);
 
         setTimeout(async () => {
-            await kafkaProducer.send({
+            await producer.send({
                 topic: JOB_TOPIC,
-                messages: [{ value: JSON.stringify({ jobId }) }]
+                messages: [{ value: JSON.stringify({ jobId }) }],
             });
         }, delay);
     }
 };
 
 export const startJobWorker = async () => {
-    await kafkaConsumer.connect();
-    await kafkaConsumer.subscribe({
+    const { producer, consumer } = await getKafkaClients();
+
+    await consumer.subscribe({
         topic: JOB_TOPIC,
-        fromBeginning: false
+        fromBeginning: false,
     });
 
     logger.info("🧵 Kafka Job Worker started");
 
-    await kafkaConsumer.run({
+    await consumer.run({
         eachMessage: async ({ message }) => {
             if (!message.value) return;
+
             const { jobId } = JSON.parse(message.value.toString());
-            await processJob(jobId);
-        }
+            await processJob(jobId, producer);
+        },
     });
 };
-
-// startJobWorker();
