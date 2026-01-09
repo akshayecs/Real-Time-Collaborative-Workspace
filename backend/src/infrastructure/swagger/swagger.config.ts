@@ -10,8 +10,8 @@ export const swaggerSpec = swaggerJsdoc({
         },
         servers: [
             {
-                url: "http://localhost:4000/api/v1",
-                description: "Local Development",
+                url: "/api/v1",
+                description: "Production",
             },
         ],
         components: {
@@ -26,10 +26,10 @@ export const swaggerSpec = swaggerJsdoc({
         security: [{ bearerAuth: [] }],
     },
 
-    // 👇 Where Swagger reads JSDoc from
     apis: [
-        "./src/interfaces/http/routes/**/*.ts",
-        "./src/interfaces/http/controllers/**/*.ts",
-        "./src/application/**/*.ts",
+        "./src/interfaces/http/routes/**/*.{ts,js}",
+        "./src/interfaces/http/controllers/**/*.{ts,js}",
+        "./dist/interfaces/http/routes/**/*.js",
+        "./dist/interfaces/http/controllers/**/*.js",
     ],
 });
