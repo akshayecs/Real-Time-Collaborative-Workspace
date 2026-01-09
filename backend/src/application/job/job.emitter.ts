@@ -1,6 +1,8 @@
-import { kafkaProducer } from "../../infrastructure/kafka/kafka.client";
+import crypto from "crypto";
+import { getKafkaProducer } from "../../infrastructure/kafka/kafka.producer";
 import { JobType, KafkaJob } from "../../shared/types/job.types";
-import { v4 as uuid } from "uuid";
+
+const JOB_TOPIC = "job-events";
 
 export async function emitJob<T extends JobType>(
     type: T,
@@ -8,15 +10,23 @@ export async function emitJob<T extends JobType>(
 ) {
     const job: KafkaJob = {
         id: crypto.randomUUID(),
-        type: JobType.DOCUMENT_SYNC,
+        type,
         payload,
         idempotencyKey: crypto.randomUUID(),
         retryCount: 0,
         maxRetries: 3,
     };
 
-    await kafkaProducer.send({
-        topic: "jobs",
+    // ✅ Kafka is OPTIONAL & lazy
+    const producer = await getKafkaProducer();
+
+    if (!producer) {
+        // Kafka disabled → just return job object
+        return job;
+    }
+
+    await producer.send({
+        topic: JOB_TOPIC,
         messages: [
             {
                 key: job.id,
@@ -24,4 +34,6 @@ export async function emitJob<T extends JobType>(
             },
         ],
     });
+
+    return job;
 }
