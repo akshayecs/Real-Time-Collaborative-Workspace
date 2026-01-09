@@ -2,15 +2,16 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# ✅ REQUIRED FOR PRISMA
+# ✅ Required for Prisma
 RUN apt-get update -y \
     && apt-get install -y openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
-RUN npm install
+# ✅ COPY FROM backend folder (CRITICAL FIX)
+COPY backend/package*.json ./
+RUN npm ci
 
-COPY . .
+COPY backend/ ./
 
 RUN npx prisma generate
 RUN npm run build
