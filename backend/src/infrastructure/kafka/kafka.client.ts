@@ -6,8 +6,14 @@ if (!env.ENABLE_JOBS || !env.KAFKA_BROKER) {
 }
 
 export const kafka = new Kafka({
-    clientId: "collab-backend",
+    clientId: process.env.KAFKA_CLIENT_ID || "collab-backend",
     brokers: [env.KAFKA_BROKER],
+    ssl: true,
+    sasl: {
+        mechanism: "plain",
+        username: process.env.KAFKA_SASL_USERNAME!,
+        password: process.env.KAFKA_SASL_PASSWORD!,
+    },
 });
 
 export const kafkaProducer = kafka.producer();
